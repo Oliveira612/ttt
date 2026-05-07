@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Velha</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e1e2f 0%, #2a2a3a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-wrapper {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+            width: 360px;
+        }
+
+        h1 {
+            color: aliceblue;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2.2em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 18px;
+            justify-content: center;
+        }
+
+        select, button {
+            padding: 10px 15px;
+            border-radius: 25px;
+            background: #4e4e6a;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        select:hover, button:hover {
+            background: #6c6c8a;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 300px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.4em;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .cell.x { color: #00f2fe; }
+        .cell.o { color: #f2a65a; }
+
+        .status {
+            text-align: center;
+            color: #fff;
+            margin: 20px 0;
+            min-height: 28px;
+        }
+
+        .score {
+            display: flex;
+            justify-content: space-between;
+            color: white;
+            margin-top: 18px;
+        }
+
+        .winning-cell {
+            animation: pulse 1s infinite;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <h1>Jogo da Velha</h1>
+        <div class="controls">
+            <select id="difficulty">
+                <option value="easy">Fácil</option>
+                <option value="medium">Médio</option>
+                <option value="hard" selected>Difícil</option>
+            </select>
+            <button id="reset">Novo Jogo</button>
+        </div>
+        <div class="status" id="status">Sua vez (X)</div>
+        <div id="board" class="board"></div>
+        <div class="score">
+            <span>Você (X): <span id="player-score">0</span></span>
+            <span>IA (O): <span id="ai-score">0</span></span>
+        </div>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const statusText = document.getElementById('status');
+        const resetBtn = document.getElementById('reset');
+        const playerScoreEl = document.getElementById('player-score');
+        const aiScoreEl = document.getElementById('ai-score');
+        const difficulty = document.getElementById('difficulty');
+
+        let cells = [];
+        let gameActive = true;
+        let boardState = Array(9).fill('');
+        let playerPoints = 0;
+        let aiPoints = 0;
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            cells = [];
+            boardState = Array(9).fill('');
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handlePlayerMove);
+                boardElement.appendChild(cell);
+                cells.push(cell);
+            }
+        }
+
+        function handlePlayerMove(e) {
+            const idx = e.target.dataset.index;
+            if (!gameActive || boardState[idx]) return;
+
+            makeMove(idx, 'x');
+           
+            if (checkWinner(boardState, 'x')) {
+                endGame('Você venceu!');
+            } else if (isDraw(boardState)) {
+                endGame('Empate!');
+            } else {
+                gameActive = false; // Bloqueia clique enquanto IA pensa
+                setTimeout(aiTurn, 500);
+            }
+        }
+
+        function aiTurn() {
+            let idx;
+            if (difficulty.value === 'easy') {
+                idx = randomMove();
+            } else if (difficulty.value === 'medium') {
+                idx = Math.random() < 0.5 ? randomMove() : minimax(boardState, 'o').index;
+            } else {
+                idx = minimax(boardState, 'o').index;
+            }
+
+            makeMove(idx, 'o');
+            gameActive = true;
+
+            if (checkWinner(boardState, 'o')) {
+                endGame('A IA venceu!');
+            } else if (isDraw(boardState)) {
+                endGame('Empate!');
+            } else {
+                statusText.textContent = 'Sua vez (X)';
+            }
+        }
+
+        function makeMove(idx, player) {
+            boardState[idx] = player;
+            cells[idx].textContent = player.toUpperCase();
+            cells[idx].classList.add(player);
+        }
+
+        function checkWinner(state, player) {
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            return wins.some(win => win.every(i => state[i] === player));
+        }
+
+        function isDraw(state) {
+            return state.every(cell => cell !== '') && !checkWinner(state, 'x') && !checkWinner(state, 'o');
+        }
+
+        function endGame(message) {
+            statusText.textContent = message;
+            gameActive = false;
+            if (message.includes('venceu')) {
+                const winner = message.includes('IA') ? 'o' : 'x';
+                highlightWinner(boardState, winner);
+                if (winner === 'x') playerScoreEl.textContent = ++playerPoints;
+                else aiScoreEl.textContent = ++aiPoints;
+            }
+        }
+
+        function highlightWinner(state, player) {
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            wins.forEach(win => {
+                if (win.every(i => state[i] === player)) {
+                    win.forEach(i => cells[i].classList.add('winning-cell'));
+                }
+            });
+        }
+
+        function randomMove() {
+            const available = boardState.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+            return available[Math.floor(Math.random() * available.length)];
+        }
+
+        function minimax(state, player) {
+            const available = state.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+
+            if (checkWinner(state, 'x')) return { score: -10 };
+            if (checkWinner(state, 'o')) return { score: 10 };
+            if (available.length === 0) return { score: 0 };
+
+            const moves = [];
+            for (let i = 0; i < available.length; i++) {
+                const move = {};
+                move.index = available[i];
+                state[available[i]] = player;
+
+                if (player === 'o') {
+                    move.score = minimax(state, 'x').score;
+                } else {
+                    move.score = minimax(state, 'o').score;
+                }
+
+                state[available[i]] = '';
+                moves.push(move);
+            }
+
+            let bestMove;
+            if (player === 'o') {
+                let bestScore = -Infinity;
+                moves.forEach((m, i) => {
+                    if (m.score > bestScore) {
+                        bestScore = m.score;
+                        bestMove = i;
+                    }
+                });
+            } else {
+                let bestScore = Infinity;
+                moves.forEach((m, i) => {
+                    if (m.score < bestScore) {
+                        bestScore = m.score;
+                        bestMove = i;
+                    }
+                });
+            }
+            return moves[bestMove];
+        }
+
+        function resetGame() {
+            gameActive = true;
+            statusText.textContent = 'Sua vez (X)';
+            createBoard();
+        }
+
+        resetBtn.addEventListener('click', resetGame);
+        difficulty.addEventListener('change', resetGame);
+        createBoard();
+    </script>
+</body>
+</html>
